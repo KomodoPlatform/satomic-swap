@@ -1,1 +1,0 @@
-{"rustc":12600465454508647808,"features":"","declared_features":"","target":0,"profile":0,"path":0,"deps":[[5572329699422558758,"build_script_build",false,7606724170954468551]],"local":[{"RerunIfChanged":{"output":"debug/build/oid-registry-54c36efc0bcae503/output","paths":["assets/oid_db.txt"]}}],"rustflags":[],"metadata":0,"config":0,"compile_kind":0}
