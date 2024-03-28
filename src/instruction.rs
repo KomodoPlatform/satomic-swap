@@ -229,6 +229,7 @@ impl AtomicSwapInstruction {
             _ => Err(ProgramError::Custom(INVALID_ATOMIC_SWAP_INSTRUCTION)),
         }
     }
+    #[allow(dead_code)]
     pub fn pack(&self) -> Vec<u8> {
         let mut buf = Vec::new();
         match *self {

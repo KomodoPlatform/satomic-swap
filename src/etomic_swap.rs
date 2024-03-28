@@ -41,7 +41,7 @@ pub fn process_instruction(
             if receiver == Pubkey::default() {
                 return Err(ProgramError::Custom(RECEIVER_SET_TO_DEFAULT));
             }
-            if amount <= 0 {
+            if amount == 0 {
                 return Err(ProgramError::Custom(AMOUNT_ZERO));
             }
             let accounts_iter = &mut accounts.iter();
@@ -89,11 +89,11 @@ pub fn process_instruction(
 
             {
                 let create_instruction = system_instruction::create_account(
-                    &sender_account.key,
-                    &vault_pda_data.key,
+                    sender_account.key,
+                    vault_pda_data.key,
                     rent_exemption_lamports,
                     41,
-                    &program_id,
+                    program_id,
                 );
 
                 let account_infos = vec![
@@ -102,7 +102,7 @@ pub fn process_instruction(
                     system_program_account.clone(), // The System Program
                 ];
 
-                let _ = invoke_signed(&create_instruction, &account_infos, &[vault_seeds_data])?;
+                invoke_signed(&create_instruction, &account_infos, &[vault_seeds_data])?;
 
                 let data = &mut vault_pda_data.try_borrow_mut_data()?; //swap_account
                                                                        // Ensure the account data has enough space
@@ -128,7 +128,7 @@ pub fn process_instruction(
                 system_program_account.clone(), // The System Program
             ];
 
-            let _ = invoke_signed(&transfer_instruction, &account_infos, &[vault_seeds])?;
+            invoke_signed(&transfer_instruction, &account_infos, &[vault_seeds])?;
             // Log the payment event
             msg!("Payment Event: {:?}", payment);
             Ok(())
@@ -147,7 +147,7 @@ pub fn process_instruction(
             if receiver == Pubkey::default() {
                 return Err(ProgramError::Custom(RECEIVER_SET_TO_DEFAULT));
             }
-            if amount <= 0 {
+            if amount == 0 {
                 return Err(ProgramError::Custom(AMOUNT_ZERO));
             }
             let accounts_iter = &mut accounts.iter();
@@ -163,7 +163,7 @@ pub fn process_instruction(
             assert_eq!(vault_pda.owner, &system_program::ID);
             assert!(system_program::check_id(system_program_account.key));
 
-            let vault_seeds: &[&[u8]] = &[
+            let _vault_seeds: &[&[u8]] = &[
                 b"swap",
                 &lock_time.to_le_bytes()[..],
                 &secret_hash[..],
@@ -194,11 +194,11 @@ pub fn process_instruction(
             let payment_bytes = payment.pack();
 
             let create_instruction = system_instruction::create_account(
-                &sender_account.key,
-                &vault_pda_data.key,
+                sender_account.key,
+                vault_pda_data.key,
                 rent_exemption_lamports,
                 41,
-                &program_id,
+                program_id,
             );
 
             let account_infos = vec![
@@ -207,7 +207,7 @@ pub fn process_instruction(
                 system_program_account.clone(), // The System Program
             ];
 
-            let _ = invoke_signed(&create_instruction, &account_infos, &[vault_seeds_data])?;
+            invoke_signed(&create_instruction, &account_infos, &[vault_seeds_data])?;
 
             let data = &mut vault_pda_data.try_borrow_mut_data()?; //swap_account
                                                                    // Ensure the account data has enough space
@@ -269,7 +269,7 @@ pub fn process_instruction(
                 &secret_hash.to_bytes()[..],
                 &[vault_bump_seed],
             ];
-            let vault_seeds_data: &[&[u8]] = &[
+            let _vault_seeds_data: &[&[u8]] = &[
                 b"swap_data",
                 &lock_time.to_le_bytes()[..],
                 &secret_hash.to_bytes()[..],
@@ -284,7 +284,7 @@ pub fn process_instruction(
                 let swap_account_data = &mut vault_pda_data
                     .try_borrow_mut_data()
                     .map_err(|_| ProgramError::Custom(SWAP_ACCOUNT_NOT_FOUND))?;
-                let mut swap_payment = Payment::unpack(&swap_account_data)?;
+                let mut swap_payment = Payment::unpack(swap_account_data)?;
                 if swap_payment.payment_hash != payment_hash.to_bytes() {
                     msg!("swap_account payment_hash: {:?}", swap_payment.payment_hash);
                     msg!("payment_hash: {:?}", payment_hash.to_bytes());
@@ -320,7 +320,7 @@ pub fn process_instruction(
                     system_program_account.clone(), // The System Program
                 ];
 
-                let _ = invoke_signed(&transfer_instruction, &account_infos, &[vault_seeds])?;
+                invoke_signed(&transfer_instruction, &account_infos, &[vault_seeds])?;
             } else {
                 // SPL Token transfer
                 msg!("Not Supported: SPL Token transfer");
@@ -387,7 +387,7 @@ pub fn process_instruction(
                 &secret_hash[..],
                 &[vault_bump_seed],
             ];
-            let vault_seeds_data: &[&[u8]] = &[
+            let _vault_seeds_data: &[&[u8]] = &[
                 b"swap_data",
                 &lock_time.to_le_bytes()[..],
                 &secret_hash[..],
@@ -414,7 +414,7 @@ pub fn process_instruction(
                 let swap_account_data = &mut vault_pda_data
                     .try_borrow_mut_data()
                     .map_err(|_| ProgramError::Custom(SWAP_ACCOUNT_NOT_FOUND))?;
-                let mut swap_payment = Payment::unpack(&swap_account_data)?;
+                let mut swap_payment = Payment::unpack(swap_account_data)?;
 
                 let clock = Clock::get()?;
                 let now = clock.unix_timestamp as u64; // Current time as Unix timestamp
@@ -454,7 +454,7 @@ pub fn process_instruction(
                     system_program_account.clone(), // The System Program
                 ];
 
-                let _ = invoke_signed(&transfer_instruction, &account_infos, &[vault_seeds])?;
+                invoke_signed(&transfer_instruction, &account_infos, &[vault_seeds])?;
             } else {
                 // SPL Token transfer
                 msg!("Not Supported: SPL Token transfer");
