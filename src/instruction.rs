@@ -16,7 +16,7 @@ pub enum AtomicSwapInstruction {
         vault_bump_seed: u8,
         vault_bump_seed_data: u8,
     },
-    SLPTokenPayment {
+    SPLTokenPayment {
         secret_hash: [u8; 32], // SHA-256 hash
         lock_time: u64,
         amount: u64,
@@ -131,7 +131,7 @@ impl AtomicSwapInstruction {
                     .map_err(|_| ProgramError::Custom(INVALID_AMOUNT))?;
                 let rent_exemption_lamports = u64::from_le_bytes(rent_exemption_lamports_array);
 
-                Ok(AtomicSwapInstruction::SLPTokenPayment {
+                Ok(AtomicSwapInstruction::SPLTokenPayment {
                     secret_hash,
                     lock_time,
                     amount,
@@ -251,7 +251,7 @@ impl AtomicSwapInstruction {
                 buf.push(vault_bump_seed);
                 buf.push(vault_bump_seed_data);
             }
-            AtomicSwapInstruction::SLPTokenPayment {
+            AtomicSwapInstruction::SPLTokenPayment {
                 ref secret_hash,
                 lock_time,
                 amount,
