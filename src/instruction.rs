@@ -8,7 +8,7 @@ use solana_program::{msg, program_error::ProgramError, pubkey::Pubkey};
 #[derive(Debug)]
 pub enum AtomicSwapInstruction {
     LamportsPayment {
-        secret_hash: [u8; 32], // SHA-256 hash
+        secret_hash: [u8; 32],
         lock_time: u64,
         amount: u64,
         receiver: Pubkey,
@@ -17,7 +17,7 @@ pub enum AtomicSwapInstruction {
         vault_bump_seed_data: u8,
     },
     SPLTokenPayment {
-        secret_hash: [u8; 32], // SHA-256 hash
+        secret_hash: [u8; 32],
         lock_time: u64,
         amount: u64,
         receiver: Pubkey,
@@ -36,7 +36,7 @@ pub enum AtomicSwapInstruction {
         vault_bump_seed_data: u8,
     },
     SenderRefund {
-        secret_hash: [u8; 32], // SHA-256 hash
+        secret_hash: [u8; 32],
         lock_time: u64,
         amount: u64,
         receiver: Pubkey,
@@ -55,7 +55,6 @@ impl AtomicSwapInstruction {
         match instruction_byte {
             0 => {
                 if input.len() != 91 {
-                    // 1 + 32 + 8 + + 8 + 32 + 8 + 1 + 1
                     return Err(ProgramError::Custom(INVALID_INPUT_LENGTH));
                 }
 
@@ -96,7 +95,6 @@ impl AtomicSwapInstruction {
             }
             1 => {
                 if input.len() != 123 {
-                    // 1 + 32 + 8 + 8 + 32 + 32 + 8 + 1 + 1
                     return Err(ProgramError::Custom(INVALID_INPUT_LENGTH));
                 }
 
@@ -144,7 +142,6 @@ impl AtomicSwapInstruction {
             }
             2 => {
                 if input.len() != 115 {
-                    // 1 + 32 + 8 + 32 + 32 + 1 + 1
                     return Err(ProgramError::Custom(INVALID_INPUT_LENGTH));
                 }
 
@@ -186,7 +183,6 @@ impl AtomicSwapInstruction {
             }
             3 => {
                 if input.len() != 115 {
-                    // 1 + 32 + 8 + 32 + 32 + 1 + 1
                     return Err(ProgramError::Custom(INVALID_INPUT_LENGTH));
                 }
 
@@ -242,7 +238,7 @@ impl AtomicSwapInstruction {
                 vault_bump_seed,
                 vault_bump_seed_data,
             } => {
-                buf.push(0); // Variant identifier for LamportsPayment
+                buf.push(0);
                 buf.extend_from_slice(secret_hash);
                 buf.extend_from_slice(&lock_time.to_le_bytes());
                 buf.extend_from_slice(&amount.to_le_bytes());
@@ -261,7 +257,7 @@ impl AtomicSwapInstruction {
                 vault_bump_seed,
                 vault_bump_seed_data,
             } => {
-                buf.push(1); // Variant identifier for SLPTokenPayment
+                buf.push(1);
                 buf.extend_from_slice(secret_hash);
                 buf.extend_from_slice(&lock_time.to_le_bytes());
                 buf.extend_from_slice(&amount.to_le_bytes());
@@ -280,7 +276,7 @@ impl AtomicSwapInstruction {
                 vault_bump_seed,
                 vault_bump_seed_data,
             } => {
-                buf.push(2); // Variant identifier for ReceiverSpend
+                buf.push(2);
                 buf.extend_from_slice(secret);
                 buf.extend_from_slice(&lock_time.to_le_bytes());
                 buf.extend_from_slice(&amount.to_le_bytes());
@@ -298,7 +294,7 @@ impl AtomicSwapInstruction {
                 vault_bump_seed,
                 vault_bump_seed_data,
             } => {
-                buf.push(3); // Variant identifier for SenderRefund
+                buf.push(3);
                 buf.extend_from_slice(secret_hash);
                 buf.extend_from_slice(&lock_time.to_le_bytes());
                 buf.extend_from_slice(&amount.to_le_bytes());
