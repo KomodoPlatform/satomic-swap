@@ -1,32 +1,28 @@
-use crate::error_code::{
-    AMOUNT_ZERO, INVALID_OWNER, INVALID_PAYMENT_HASH, INVALID_PAYMENT_STATE, NOT_SUPPORTED,
-    RECEIVER_SET_TO_DEFAULT, SWAP_ACCOUNT_NOT_FOUND,
-};
+use crate::error_code::NOT_SUPPORTED;
 use crate::instruction::AtomicSwapInstruction;
-use crate::payment::{Payment, PaymentState};
+use crate::payment::PaymentState;
+use crate::utils::{
+    account::{create_account_and_write_data, get_common_accounts},
+    hash::{calculate_hash, calculate_hash_from_secret},
+    payment::{create_payment_object, transfer_lamports, update_common_payment_state},
+    validation::{validate_common_payment_params, validate_accounts},
+};
 use solana_program::{
-    account_info::{next_account_info, AccountInfo},
+    account_info::AccountInfo,
     entrypoint,
     entrypoint::ProgramResult,
-    hash::Hasher,
-    msg,
-    program::invoke_signed,
     program_error::ProgramError,
     pubkey::Pubkey,
-    system_instruction, system_program,
-    sysvar::clock::Clock,
-    sysvar::Sysvar,
 };
 
 entrypoint!(process_instruction);
 
-pub fn process_instruction(
-    program_id: &Pubkey,
-    accounts: &[AccountInfo],
+pub fn process_instruction<'a>(
+    program_id: &'a Pubkey,
+    accounts: &'a [AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
     let instruction = AtomicSwapInstruction::unpack(instruction_data[0], instruction_data)?;
-
     match instruction {
         AtomicSwapInstruction::LamportsPayment {
             secret_hash,
@@ -37,25 +33,9 @@ pub fn process_instruction(
             vault_bump_seed,
             vault_bump_seed_data,
         } => {
-            msg!("Processing Payment");
-            if receiver == Pubkey::default() {
-                return Err(ProgramError::Custom(RECEIVER_SET_TO_DEFAULT));
-            }
-            if amount == 0 {
-                return Err(ProgramError::Custom(AMOUNT_ZERO));
-            }
-            let accounts_iter = &mut accounts.iter();
-            let sender_account = next_account_info(accounts_iter)?;
-            let vault_pda_data = next_account_info(accounts_iter)?;
-            let vault_pda = next_account_info(accounts_iter)?;
-            let system_program_account = next_account_info(accounts_iter)?;
-
-            assert!(sender_account.is_signer);
-            assert!(vault_pda_data.is_writable);
-            assert!(vault_pda.is_writable);
-            assert_eq!(vault_pda.owner, &system_program::ID);
-            assert!(system_program::check_id(system_program_account.key));
-
+            validate_common_payment_params(receiver, amount)?;
+            let (sender_account, vault_pda_data, vault_pda, system_program_account) = get_common_accounts(accounts)?;
+            validate_accounts(sender_account, vault_pda_data, vault_pda, system_program_account, None)?;
             let vault_seeds: &[&[u8]] = &[
                 b"swap",
                 &lock_time.to_le_bytes()[..],
@@ -68,65 +48,25 @@ pub fn process_instruction(
                 &secret_hash[..],
                 &[vault_bump_seed_data],
             ];
-
-            let mut hasher = Hasher::default();
-            hasher.hash(&receiver.to_bytes());
-            hasher.hash(sender_account.key.as_ref());
-            hasher.hash(&secret_hash);
-            let zero_address = Pubkey::new_from_array([0; 32]);
-            hasher.hash(&zero_address.to_bytes());
-            let amount_bytes = amount.to_le_bytes();
-            hasher.hash(&amount_bytes);
-
-            let payment_hash = hasher.result();
-
-            let payment = Payment {
-                payment_hash: payment_hash.to_bytes(),
-                lock_time,
-                state: PaymentState::PaymentSent,
-            };
-            let payment_bytes = payment.pack();
-
-            {
-                let create_instruction = system_instruction::create_account(
-                    sender_account.key,
-                    vault_pda_data.key,
-                    rent_exemption_lamports,
-                    41,
-                    program_id,
-                );
-
-                let account_infos = vec![
-                    sender_account.clone(),
-                    vault_pda_data.clone(),
-                    system_program_account.clone(),
-                ];
-
-                invoke_signed(&create_instruction, &account_infos, &[vault_seeds_data])?;
-
-                let data = &mut vault_pda_data.try_borrow_mut_data()?;
-                if data.len() < payment_bytes.len() {
-                    msg!("Error: Account data buffer too small");
-                    return Err(ProgramError::AccountDataTooSmall);
-                }
-
-                data[..payment_bytes.len()].copy_from_slice(&payment_bytes);
-            }
-
-            let transfer_instruction = system_instruction::transfer(
-                sender_account.key,
-                vault_pda.key,
+            let payment_hash = calculate_hash(&receiver, sender_account.key, &secret_hash, None, amount);
+            let payment_bytes = create_payment_object(payment_hash, lock_time).pack();
+            create_account_and_write_data(
+                sender_account,
+                vault_pda_data,
+                rent_exemption_lamports,
+                program_id,
+                system_program_account,
+                vault_seeds_data,
+                payment_bytes,
+            )?;
+            transfer_lamports(
+                sender_account,
+                vault_pda,
+                system_program_account,
+                vault_seeds,
                 amount + rent_exemption_lamports,
-            );
+            )?;
 
-            let account_infos = vec![
-                sender_account.clone(),
-                vault_pda.clone(),
-                system_program_account.clone(),
-            ];
-
-            invoke_signed(&transfer_instruction, &account_infos, &[vault_seeds])?;
-            msg!("Payment Event: {:?}", payment);
             Ok(())
         }
         AtomicSwapInstruction::SPLTokenPayment {
@@ -136,83 +76,30 @@ pub fn process_instruction(
             receiver,
             token_program,
             rent_exemption_lamports,
-            vault_bump_seed,
+            vault_bump_seed: _,
             vault_bump_seed_data,
         } => {
-            msg!("Processing Payment");
-            if receiver == Pubkey::default() {
-                return Err(ProgramError::Custom(RECEIVER_SET_TO_DEFAULT));
-            }
-            if amount == 0 {
-                return Err(ProgramError::Custom(AMOUNT_ZERO));
-            }
-            let accounts_iter = &mut accounts.iter();
-            let sender_account = next_account_info(accounts_iter)?;
-            let vault_pda_data = next_account_info(accounts_iter)?;
-            let vault_pda = next_account_info(accounts_iter)?;
-            let system_program_account = next_account_info(accounts_iter)?;
-
-            assert!(sender_account.is_signer);
-            assert!(vault_pda_data.is_writable);
-            assert!(vault_pda.is_writable);
-            assert_eq!(vault_pda.owner, &system_program::ID);
-            assert!(system_program::check_id(system_program_account.key));
-
-            let _vault_seeds: &[&[u8]] = &[
-                b"swap",
-                &lock_time.to_le_bytes()[..],
-                &secret_hash[..],
-                &[vault_bump_seed],
-            ];
+            validate_common_payment_params(receiver, amount)?;
+            let (sender_account, vault_pda_data, vault_pda, system_program_account) = get_common_accounts(accounts)?;
+            validate_accounts(sender_account, vault_pda_data, vault_pda, system_program_account, None)?;
             let vault_seeds_data: &[&[u8]] = &[
                 b"swap_data",
                 &lock_time.to_le_bytes()[..],
                 &secret_hash[..],
                 &[vault_bump_seed_data],
             ];
-
-            let mut hasher = Hasher::default();
-            hasher.hash(&receiver.to_bytes());
-            hasher.hash(sender_account.key.as_ref());
-            hasher.hash(&secret_hash);
-            hasher.hash(&token_program.to_bytes());
-            let amount_bytes = amount.to_le_bytes();
-            hasher.hash(&amount_bytes);
-
-            let payment_hash = hasher.result();
-
-            let payment = Payment {
-                payment_hash: payment_hash.to_bytes(),
-                lock_time,
-                state: PaymentState::PaymentSent,
-            };
-            let payment_bytes = payment.pack();
-
-            let create_instruction = system_instruction::create_account(
-                sender_account.key,
-                vault_pda_data.key,
+            let payment_hash = calculate_hash(&receiver, sender_account.key, &secret_hash, Some(&token_program), amount);
+            let payment_bytes = create_payment_object(payment_hash, lock_time).pack();
+            create_account_and_write_data(
+                sender_account,
+                vault_pda_data,
                 rent_exemption_lamports,
-                41,
                 program_id,
-            );
+                system_program_account,
+                vault_seeds_data,
+                payment_bytes,
+            )?;
 
-            let account_infos = vec![
-                vault_pda_data.clone(),
-                sender_account.clone(),
-                system_program_account.clone(),
-            ];
-
-            invoke_signed(&create_instruction, &account_infos, &[vault_seeds_data])?;
-
-            let data = &mut vault_pda_data.try_borrow_mut_data()?;
-            if data.len() < payment_bytes.len() {
-                msg!("Error: Account data buffer too small");
-                return Err(ProgramError::AccountDataTooSmall);
-            }
-
-            data[..payment_bytes.len()].copy_from_slice(&payment_bytes);
-
-            msg!("Payment Event: {:?}", payment);
             Ok(())
         }
         AtomicSwapInstruction::ReceiverSpend {
@@ -222,97 +109,24 @@ pub fn process_instruction(
             sender,
             token_program,
             vault_bump_seed,
-            vault_bump_seed_data,
+            vault_bump_seed_data: _,
         } => {
-            msg!("Processing ReceiverSpend");
-            let accounts_iter = &mut accounts.iter();
-            let receiver_account = next_account_info(accounts_iter)?;
-            let vault_pda_data = next_account_info(accounts_iter)?;
-            let vault_pda = next_account_info(accounts_iter)?;
-            let system_program_account = next_account_info(accounts_iter)?;
-
-            assert!(receiver_account.is_writable);
-            assert!(receiver_account.is_signer);
-            assert!(vault_pda_data.is_writable);
-            assert!(vault_pda.is_writable);
-            assert_eq!(vault_pda.owner, &system_program::ID);
-            assert!(system_program::check_id(system_program_account.key));
-
-            if vault_pda_data.owner != program_id {
-                return Err(ProgramError::Custom(INVALID_OWNER));
-            }
-
-            let mut hasher = Hasher::default();
-            hasher.hash(&secret);
-            let secret_hash = hasher.result();
-
-            let mut hasher = Hasher::default();
-            hasher.hash(receiver_account.key.as_ref());
-            hasher.hash(&sender.to_bytes());
-            hasher.hash(&secret_hash.to_bytes());
-            hasher.hash(&token_program.to_bytes());
-            let amount_bytes = amount.to_le_bytes();
-            hasher.hash(&amount_bytes);
-
+            let (receiver_account, vault_pda_data, vault_pda, system_program_account) = get_common_accounts(accounts)?;
+            validate_accounts(receiver_account, vault_pda_data, vault_pda, system_program_account, Some(program_id))?;
+            let secret_hash = calculate_hash_from_secret(&secret);
+            let payment_hash = calculate_hash(receiver_account.key, &sender, &secret_hash.to_bytes(), Some(&token_program), amount);
             let vault_seeds: &[&[u8]] = &[
                 b"swap",
                 &lock_time.to_le_bytes()[..],
                 &secret_hash.to_bytes()[..],
                 &[vault_bump_seed],
             ];
-            let _vault_seeds_data: &[&[u8]] = &[
-                b"swap_data",
-                &lock_time.to_le_bytes()[..],
-                &secret_hash.to_bytes()[..],
-                &[vault_bump_seed_data],
-            ];
-
-            let payment_hash = hasher.result();
-
-            {
-                let swap_account_data = &mut vault_pda_data
-                    .try_borrow_mut_data()
-                    .map_err(|_| ProgramError::Custom(SWAP_ACCOUNT_NOT_FOUND))?;
-                let mut swap_payment = Payment::unpack(swap_account_data)?;
-                if swap_payment.payment_hash != payment_hash.to_bytes() {
-                    msg!("swap_account payment_hash: {:?}", swap_payment.payment_hash);
-                    msg!("payment_hash: {:?}", payment_hash.to_bytes());
-                    return Err(ProgramError::Custom(INVALID_PAYMENT_HASH));
-                }
-                if swap_payment.state != PaymentState::PaymentSent {
-                    return Err(ProgramError::Custom(INVALID_PAYMENT_STATE));
-                }
-
-                swap_payment.state = PaymentState::ReceiverSpent;
-                let payment_bytes = swap_payment.pack();
-
-                if swap_account_data.len() < payment_bytes.len() {
-                    msg!("Error: Account data buffer too small");
-                    return Err(ProgramError::AccountDataTooSmall);
-                }
-                swap_account_data[..payment_bytes.len()].copy_from_slice(&payment_bytes);
-            }
-            if token_program == Pubkey::new_from_array([0; 32]) {
-                let transfer_instruction =
-                    system_instruction::transfer(vault_pda.key, receiver_account.key, amount);
-
-                let account_infos = vec![
-                    vault_pda.clone(),
-                    receiver_account.clone(),
-                    system_program_account.clone(),
-                ];
-
-                invoke_signed(&transfer_instruction, &account_infos, &[vault_seeds])?;
-            } else {
-                msg!("Not Supported: SPL Token transfer");
+            update_common_payment_state(vault_pda_data, payment_hash, PaymentState::PaymentSent, PaymentState::ReceiverSpent)?;
+            if token_program != Pubkey::new_from_array([0; 32]) {
                 return Err(ProgramError::Custom(NOT_SUPPORTED));
             }
+            transfer_lamports(vault_pda, receiver_account, system_program_account, vault_seeds, amount)?;
 
-            msg!(
-                "Swap account: {:?} , Secret: {:?}",
-                vault_pda_data.key,
-                secret
-            );
             Ok(())
         }
         AtomicSwapInstruction::SenderRefund {
@@ -322,94 +136,23 @@ pub fn process_instruction(
             receiver,
             token_program,
             vault_bump_seed,
-            vault_bump_seed_data,
+            vault_bump_seed_data: _,
         } => {
-            msg!("Processing SenderRefund");
-            let accounts_iter = &mut accounts.iter();
-            let sender_account = next_account_info(accounts_iter)?;
-            let vault_pda_data = next_account_info(accounts_iter)?;
-            let vault_pda = next_account_info(accounts_iter)?;
-            let system_program_account = next_account_info(accounts_iter)?;
-
-            assert!(sender_account.is_writable);
-            assert!(sender_account.is_signer);
-            assert!(vault_pda_data.is_writable);
-            assert!(vault_pda.is_writable);
-            assert_eq!(vault_pda.owner, &system_program::ID);
-            assert!(system_program::check_id(system_program_account.key));
-
+            let (sender_account, vault_pda_data, vault_pda, system_program_account) = get_common_accounts(accounts)?;
+            validate_accounts(sender_account, vault_pda_data, vault_pda, system_program_account, Some(program_id))?;
+            let payment_hash = calculate_hash(&receiver, sender_account.key, &secret_hash, Some(&token_program), amount);
             let vault_seeds: &[&[u8]] = &[
                 b"swap",
                 &lock_time.to_le_bytes()[..],
                 &secret_hash[..],
                 &[vault_bump_seed],
             ];
-            let _vault_seeds_data: &[&[u8]] = &[
-                b"swap_data",
-                &lock_time.to_le_bytes()[..],
-                &secret_hash[..],
-                &[vault_bump_seed_data],
-            ];
-
-            if vault_pda_data.owner != program_id {
-                return Err(ProgramError::Custom(INVALID_OWNER));
-            }
-
-            let mut hasher = Hasher::default();
-            hasher.hash(&receiver.to_bytes());
-            hasher.hash(sender_account.key.as_ref());
-            hasher.hash(&secret_hash);
-            hasher.hash(&token_program.to_bytes());
-            let amount_bytes = amount.to_le_bytes();
-            hasher.hash(&amount_bytes);
-
-            let payment_hash = hasher.result();
-
-            {
-                let swap_account_data = &mut vault_pda_data
-                    .try_borrow_mut_data()
-                    .map_err(|_| ProgramError::Custom(SWAP_ACCOUNT_NOT_FOUND))?;
-                let mut swap_payment = Payment::unpack(swap_account_data)?;
-
-                let clock = Clock::get()?;
-                let now = clock.unix_timestamp as u64;
-
-                if swap_payment.payment_hash != payment_hash.to_bytes()
-                    && now >= swap_payment.lock_time
-                {
-                    return Err(ProgramError::Custom(INVALID_PAYMENT_HASH));
-                }
-                if swap_payment.state != PaymentState::PaymentSent {
-                    return Err(ProgramError::Custom(INVALID_PAYMENT_STATE));
-                }
-
-                swap_payment.state = PaymentState::SenderRefunded;
-                let payment_bytes = swap_payment.pack();
-
-                if swap_account_data.len() < payment_bytes.len() {
-                    msg!("Error: Account data buffer too small");
-                    return Err(ProgramError::AccountDataTooSmall);
-                }
-
-                swap_account_data[..payment_bytes.len()].copy_from_slice(&payment_bytes);
-            }
-            if token_program == Pubkey::new_from_array([0; 32]) {
-                let transfer_instruction =
-                    system_instruction::transfer(vault_pda.key, sender_account.key, amount);
-
-                let account_infos = vec![
-                    vault_pda.clone(),
-                    sender_account.clone(),
-                    system_program_account.clone(),
-                ];
-
-                invoke_signed(&transfer_instruction, &account_infos, &[vault_seeds])?;
-            } else {
-                msg!("Not Supported: SPL Token transfer");
+            update_common_payment_state(vault_pda_data, payment_hash, PaymentState::PaymentSent, PaymentState::SenderRefunded)?;
+            if token_program != Pubkey::new_from_array([0; 32]) {
                 return Err(ProgramError::Custom(NOT_SUPPORTED));
             }
+            transfer_lamports(vault_pda, sender_account, system_program_account, vault_seeds, amount)?;
 
-            msg!("Swap account: {:?}", vault_pda_data.key);
             Ok(())
         }
     }

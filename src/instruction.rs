@@ -3,7 +3,7 @@ use crate::error_code::{
     INVALID_RECEIVER_PUBKEY, INVALID_SECRET, INVALID_SECRET_HASH, INVALID_SENDER_PUBKEY,
     INVALID_TOKEN_PROGRAM,
 };
-use solana_program::{msg, program_error::ProgramError, pubkey::Pubkey};
+use solana_program::{program_error::ProgramError, pubkey::Pubkey};
 
 #[derive(Debug)]
 pub enum AtomicSwapInstruction {
@@ -51,7 +51,6 @@ impl AtomicSwapInstruction {
         instruction_byte: u8,
         input: &[u8],
     ) -> Result<AtomicSwapInstruction, ProgramError> {
-        msg!("input length: {}", input.len());
         match instruction_byte {
             0 => {
                 if input.len() != 91 {
