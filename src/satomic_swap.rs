@@ -62,7 +62,6 @@ pub fn process_instruction<'a>(
             transfer_lamports(
                 sender_account,
                 vault_pda,
-                system_program_account,
                 vault_seeds,
                 amount + rent_exemption_lamports,
             )?;
@@ -125,7 +124,7 @@ pub fn process_instruction<'a>(
             if token_program != Pubkey::new_from_array([0; 32]) {
                 return Err(ProgramError::Custom(NOT_SUPPORTED));
             }
-            transfer_lamports(vault_pda, receiver_account, system_program_account, vault_seeds, amount)?;
+            transfer_lamports(vault_pda, receiver_account, vault_seeds, amount)?;
 
             Ok(())
         }
@@ -151,7 +150,7 @@ pub fn process_instruction<'a>(
             if token_program != Pubkey::new_from_array([0; 32]) {
                 return Err(ProgramError::Custom(NOT_SUPPORTED));
             }
-            transfer_lamports(vault_pda, sender_account, system_program_account, vault_seeds, amount)?;
+            transfer_lamports(vault_pda, sender_account, vault_seeds, amount)?;
 
             Ok(())
         }

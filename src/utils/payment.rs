@@ -21,7 +21,6 @@ pub(crate) fn create_payment_object(payment_hash: solana_program::hash::Hash, lo
 pub(crate) fn transfer_lamports<'a, 'b>(
     source_account: &'a AccountInfo<'b>,
     destination_account: &'a AccountInfo<'b>,
-    system_program_account: &'a AccountInfo<'b>,
     vault_seeds: &[&[u8]],
     amount: u64,
 ) -> ProgramResult {
@@ -29,7 +28,6 @@ pub(crate) fn transfer_lamports<'a, 'b>(
     let account_infos = vec![
         source_account.clone(),
         destination_account.clone(),
-        system_program_account.clone(),
     ];
     invoke_signed(&transfer_instruction, &account_infos, &[vault_seeds])?;
 
