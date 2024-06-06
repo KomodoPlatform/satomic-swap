@@ -7,14 +7,29 @@ use solana_program::{
     system_instruction,
 };
 
-pub(crate) fn get_common_accounts<'a, 'b>(accounts: &'a [AccountInfo<'b>]) -> Result<(&'a AccountInfo<'b>, &'a AccountInfo<'b>, &'a AccountInfo<'b>, &'a AccountInfo<'b>), ProgramError> {
+pub(crate) fn get_common_accounts<'a, 'b>(
+    accounts: &'a [AccountInfo<'b>],
+) -> Result<
+    (
+        &'a AccountInfo<'b>,
+        &'a AccountInfo<'b>,
+        &'a AccountInfo<'b>,
+        &'a AccountInfo<'b>,
+    ),
+    ProgramError,
+> {
     let accounts_iter = &mut accounts.iter();
     let sender_account = next_account_info(accounts_iter)?;
     let vault_pda_data = next_account_info(accounts_iter)?;
     let vault_pda = next_account_info(accounts_iter)?;
     let system_program_account = next_account_info(accounts_iter)?;
 
-    Ok((sender_account, vault_pda_data, vault_pda, system_program_account))
+    Ok((
+        sender_account,
+        vault_pda_data,
+        vault_pda,
+        system_program_account,
+    ))
 }
 
 pub(crate) fn create_account_and_write_data<'a, 'b>(

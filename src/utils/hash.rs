@@ -3,7 +3,13 @@ use solana_program::{
     pubkey::Pubkey,
 };
 
-pub(crate) fn calculate_hash(receiver: &Pubkey, sender_key: &Pubkey, secret_hash: &[u8], token_program: Option<&Pubkey>, amount: u64) -> Hash {
+pub(crate) fn calculate_hash(
+    receiver: &Pubkey,
+    sender_key: &Pubkey,
+    secret_hash: &[u8],
+    token_program: Option<&Pubkey>,
+    amount: u64,
+) -> Hash {
     let mut hasher = Hasher::default();
     hasher.hash(receiver.as_ref());
     hasher.hash(sender_key.as_ref());

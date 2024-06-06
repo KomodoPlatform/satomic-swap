@@ -1,16 +1,14 @@
-use crate::error_code::{
-    INVALID_PAYMENT_HASH, INVALID_PAYMENT_STATE, SWAP_ACCOUNT_NOT_FOUND,
-};
+use crate::error_code::{INVALID_PAYMENT_HASH, INVALID_PAYMENT_STATE, SWAP_ACCOUNT_NOT_FOUND};
 use crate::payment::{Payment, PaymentState};
 use solana_program::{
-    account_info::AccountInfo,
-    entrypoint::ProgramResult,
-    program::invoke_signed,
-    program_error::ProgramError,
-    system_instruction,
+    account_info::AccountInfo, entrypoint::ProgramResult, program::invoke_signed,
+    program_error::ProgramError, system_instruction,
 };
 
-pub(crate) fn create_payment_object(payment_hash: solana_program::hash::Hash, lock_time: u64) -> Payment {
+pub(crate) fn create_payment_object(
+    payment_hash: solana_program::hash::Hash,
+    lock_time: u64,
+) -> Payment {
     Payment {
         payment_hash: payment_hash.to_bytes(),
         lock_time,
@@ -24,11 +22,9 @@ pub(crate) fn transfer_lamports<'a, 'b>(
     vault_seeds: &[&[u8]],
     amount: u64,
 ) -> ProgramResult {
-    let transfer_instruction = system_instruction::transfer(source_account.key, destination_account.key, amount);
-    let account_infos = vec![
-        source_account.clone(),
-        destination_account.clone(),
-    ];
+    let transfer_instruction =
+        system_instruction::transfer(source_account.key, destination_account.key, amount);
+    let account_infos = vec![source_account.clone(), destination_account.clone()];
     invoke_signed(&transfer_instruction, &account_infos, &[vault_seeds])?;
 
     Ok(())

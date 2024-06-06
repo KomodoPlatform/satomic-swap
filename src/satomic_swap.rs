@@ -5,13 +5,10 @@ use crate::utils::{
     account::{create_account_and_write_data, get_common_accounts},
     hash::{calculate_hash, calculate_hash_from_secret},
     payment::{create_payment_object, transfer_lamports, update_common_payment_state},
-    validation::{validate_common_payment_params, validate_accounts},
+    validation::{validate_accounts, validate_common_payment_params},
 };
 use solana_program::{
-    account_info::AccountInfo,
-    entrypoint,
-    entrypoint::ProgramResult,
-    program_error::ProgramError,
+    account_info::AccountInfo, entrypoint, entrypoint::ProgramResult, program_error::ProgramError,
     pubkey::Pubkey,
 };
 
@@ -34,8 +31,15 @@ pub fn process_instruction<'a>(
             vault_bump_seed_data,
         } => {
             validate_common_payment_params(receiver, amount)?;
-            let (sender_account, vault_pda_data, vault_pda, system_program_account) = get_common_accounts(accounts)?;
-            validate_accounts(sender_account, vault_pda_data, vault_pda, system_program_account, None)?;
+            let (sender_account, vault_pda_data, vault_pda, system_program_account) =
+                get_common_accounts(accounts)?;
+            validate_accounts(
+                sender_account,
+                vault_pda_data,
+                vault_pda,
+                system_program_account,
+                None,
+            )?;
             let vault_seeds: &[&[u8]] = &[
                 b"swap",
                 &lock_time.to_le_bytes()[..],
@@ -48,7 +52,8 @@ pub fn process_instruction<'a>(
                 &secret_hash[..],
                 &[vault_bump_seed_data],
             ];
-            let payment_hash = calculate_hash(&receiver, sender_account.key, &secret_hash, None, amount);
+            let payment_hash =
+                calculate_hash(&receiver, sender_account.key, &secret_hash, None, amount);
             let payment_bytes = create_payment_object(payment_hash, lock_time).pack();
             create_account_and_write_data(
                 sender_account,
@@ -79,15 +84,28 @@ pub fn process_instruction<'a>(
             vault_bump_seed_data,
         } => {
             validate_common_payment_params(receiver, amount)?;
-            let (sender_account, vault_pda_data, vault_pda, system_program_account) = get_common_accounts(accounts)?;
-            validate_accounts(sender_account, vault_pda_data, vault_pda, system_program_account, None)?;
+            let (sender_account, vault_pda_data, vault_pda, system_program_account) =
+                get_common_accounts(accounts)?;
+            validate_accounts(
+                sender_account,
+                vault_pda_data,
+                vault_pda,
+                system_program_account,
+                None,
+            )?;
             let vault_seeds_data: &[&[u8]] = &[
                 b"swap_data",
                 &lock_time.to_le_bytes()[..],
                 &secret_hash[..],
                 &[vault_bump_seed_data],
             ];
-            let payment_hash = calculate_hash(&receiver, sender_account.key, &secret_hash, Some(&token_program), amount);
+            let payment_hash = calculate_hash(
+                &receiver,
+                sender_account.key,
+                &secret_hash,
+                Some(&token_program),
+                amount,
+            );
             let payment_bytes = create_payment_object(payment_hash, lock_time).pack();
             create_account_and_write_data(
                 sender_account,
@@ -110,17 +128,35 @@ pub fn process_instruction<'a>(
             vault_bump_seed,
             vault_bump_seed_data: _,
         } => {
-            let (receiver_account, vault_pda_data, vault_pda, system_program_account) = get_common_accounts(accounts)?;
-            validate_accounts(receiver_account, vault_pda_data, vault_pda, system_program_account, Some(program_id))?;
+            let (receiver_account, vault_pda_data, vault_pda, system_program_account) =
+                get_common_accounts(accounts)?;
+            validate_accounts(
+                receiver_account,
+                vault_pda_data,
+                vault_pda,
+                system_program_account,
+                Some(program_id),
+            )?;
             let secret_hash = calculate_hash_from_secret(&secret);
-            let payment_hash = calculate_hash(receiver_account.key, &sender, &secret_hash.to_bytes(), Some(&token_program), amount);
+            let payment_hash = calculate_hash(
+                receiver_account.key,
+                &sender,
+                &secret_hash.to_bytes(),
+                Some(&token_program),
+                amount,
+            );
             let vault_seeds: &[&[u8]] = &[
                 b"swap",
                 &lock_time.to_le_bytes()[..],
                 &secret_hash.to_bytes()[..],
                 &[vault_bump_seed],
             ];
-            update_common_payment_state(vault_pda_data, payment_hash, PaymentState::PaymentSent, PaymentState::ReceiverSpent)?;
+            update_common_payment_state(
+                vault_pda_data,
+                payment_hash,
+                PaymentState::PaymentSent,
+                PaymentState::ReceiverSpent,
+            )?;
             if token_program != Pubkey::new_from_array([0; 32]) {
                 return Err(ProgramError::Custom(NOT_SUPPORTED));
             }
@@ -137,16 +173,34 @@ pub fn process_instruction<'a>(
             vault_bump_seed,
             vault_bump_seed_data: _,
         } => {
-            let (sender_account, vault_pda_data, vault_pda, system_program_account) = get_common_accounts(accounts)?;
-            validate_accounts(sender_account, vault_pda_data, vault_pda, system_program_account, Some(program_id))?;
-            let payment_hash = calculate_hash(&receiver, sender_account.key, &secret_hash, Some(&token_program), amount);
+            let (sender_account, vault_pda_data, vault_pda, system_program_account) =
+                get_common_accounts(accounts)?;
+            validate_accounts(
+                sender_account,
+                vault_pda_data,
+                vault_pda,
+                system_program_account,
+                Some(program_id),
+            )?;
+            let payment_hash = calculate_hash(
+                &receiver,
+                sender_account.key,
+                &secret_hash,
+                Some(&token_program),
+                amount,
+            );
             let vault_seeds: &[&[u8]] = &[
                 b"swap",
                 &lock_time.to_le_bytes()[..],
                 &secret_hash[..],
                 &[vault_bump_seed],
             ];
-            update_common_payment_state(vault_pda_data, payment_hash, PaymentState::PaymentSent, PaymentState::SenderRefunded)?;
+            update_common_payment_state(
+                vault_pda_data,
+                payment_hash,
+                PaymentState::PaymentSent,
+                PaymentState::SenderRefunded,
+            )?;
             if token_program != Pubkey::new_from_array([0; 32]) {
                 return Err(ProgramError::Custom(NOT_SUPPORTED));
             }
