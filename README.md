@@ -10,7 +10,7 @@ https://docs.solanalabs.com/cli/install
 ```
 sh -c "$(curl -sSfL https://release.solana.com/{version}/install)"
 ```
-Replace string {version} with the current solana version in Cargo.toml file.
+Replace the string `{version}` with the current Solana version in the Cargo.toml file.
 
 ### Build the project
 
