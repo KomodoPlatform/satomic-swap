@@ -117,6 +117,8 @@ pub fn process_instruction<'a>(
                 payment_bytes,
             )?;
 
+            // TODO: The transfer of tokens should be performed here.
+
             Ok(())
         }
         AtomicSwapInstruction::ReceiverSpend {
@@ -162,6 +164,8 @@ pub fn process_instruction<'a>(
             }
             transfer_lamports(vault_pda, receiver_account, vault_seeds, amount)?;
 
+            // TODO: The transfer of tokens should be performed here.
+
             Ok(())
         }
         AtomicSwapInstruction::SenderRefund {
@@ -205,6 +209,8 @@ pub fn process_instruction<'a>(
                 return Err(ProgramError::Custom(NOT_SUPPORTED));
             }
             transfer_lamports(vault_pda, sender_account, vault_seeds, amount)?;
+
+            // TODO: The transfer of tokens should be performed here.
 
             Ok(())
         }

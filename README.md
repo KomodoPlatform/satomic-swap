@@ -5,11 +5,13 @@ Satomic Swap Program allowing Solana atomic swaps on Komodo SDK.
 ### Install rust
 https://www.rust-lang.org/tools/install
 
-### Install Solana CLI v1.18.8
+### Install Solana CLI
 https://docs.solanalabs.com/cli/install
 ```
-sh -c "$(curl -sSfL https://release.solana.com/v1.18.8/install)"
+sh -c "$(curl -sSfL https://release.solana.com/{version}/install)"
 ```
+Replace string {version} with the current solana version in Cargo.toml file.
+
 ### Build the project
 
 To compile shared object (the program binary .so) run the command
