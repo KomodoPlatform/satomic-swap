@@ -1,3 +1,4 @@
+use crate::utils::account::ACCOUNT_SIZE;
 use solana_program::program_error::ProgramError;
 
 #[derive(Debug)]
@@ -17,7 +18,7 @@ pub enum PaymentState {
 
 impl Payment {
     pub fn unpack(input: &[u8]) -> Result<Self, ProgramError> {
-        if input.len() != 41 {
+        if input.len() != ACCOUNT_SIZE as usize {
             return Err(ProgramError::InvalidAccountData);
         }
 

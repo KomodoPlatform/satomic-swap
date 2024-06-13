@@ -6,6 +6,7 @@ use solana_program::{
     pubkey::Pubkey,
     system_instruction,
 };
+pub const ACCOUNT_SIZE: u64 = 41;
 
 pub(crate) fn get_common_accounts<'a, 'b>(
     accounts: &'a [AccountInfo<'b>],
@@ -41,12 +42,11 @@ pub(crate) fn create_account_and_write_data<'a, 'b>(
     vault_seeds_data: &[&[u8]],
     payment_bytes: Vec<u8>,
 ) -> ProgramResult {
-    let account_size = 41;
     let create_instruction = system_instruction::create_account(
         sender_account.key,
         vault_pda_data.key,
         rent_exemption_lamports,
-        account_size,
+        ACCOUNT_SIZE,
         program_id,
     );
     let account_infos = vec![
