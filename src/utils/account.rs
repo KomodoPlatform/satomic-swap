@@ -6,7 +6,8 @@ use solana_program::{
     pubkey::Pubkey,
     system_instruction,
 };
-pub const ACCOUNT_SIZE: u64 = 41;
+
+use crate::STORAGE_SPACE_ALLOCATED;
 
 pub(crate) fn get_common_accounts<'a, 'b>(
     accounts: &'a [AccountInfo<'b>],
@@ -46,7 +47,7 @@ pub(crate) fn create_account_and_write_data<'a, 'b>(
         sender_account.key,
         vault_pda_data.key,
         rent_exemption_lamports,
-        ACCOUNT_SIZE,
+        STORAGE_SPACE_ALLOCATED,
         program_id,
     );
     let account_infos = vec![

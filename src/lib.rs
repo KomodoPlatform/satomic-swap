@@ -6,4 +6,4 @@ mod satomic_swap;
 mod tests;
 mod utils;
 
-pub use utils::account::ACCOUNT_SIZE;
+pub const STORAGE_SPACE_ALLOCATED: u64 = 41;
