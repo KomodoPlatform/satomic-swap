@@ -1,7 +1,5 @@
 use solana_program::program_error::ProgramError;
 
-use crate::STORAGE_SPACE_ALLOCATED;
-
 #[derive(Debug)]
 pub struct Payment {
     pub payment_hash: [u8; 32],
@@ -19,7 +17,7 @@ pub enum PaymentState {
 
 impl Payment {
     pub fn unpack(input: &[u8]) -> Result<Self, ProgramError> {
-        if input.len() != STORAGE_SPACE_ALLOCATED as usize {
+        if input.len() != 41 {
             return Err(ProgramError::InvalidAccountData);
         }
 

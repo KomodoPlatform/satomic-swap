@@ -56,6 +56,8 @@ pub(crate) fn create_account_and_write_data<'a, 'b>(
         system_program_account.clone(),
     ];
     invoke_signed(&create_instruction, &account_infos, &[vault_seeds_data])?;
+
+    // invoke_signed with create_account allocates bytes for the new account, vault_pda_data cannot be checked earlier
     let data = &mut vault_pda_data.try_borrow_mut_data()?;
     if data.len() < payment_bytes.len() {
         return Err(ProgramError::AccountDataTooSmall);
