@@ -5,6 +5,8 @@ use crate::error_code::{
 };
 use solana_program::{program_error::ProgramError, pubkey::Pubkey};
 
+pub const STORAGE_SPACE_ALLOCATED: u64 = 41;
+
 #[derive(Debug)]
 pub enum AtomicSwapInstruction {
     LamportsPayment {

@@ -7,7 +7,7 @@ use solana_program::{
     system_instruction,
 };
 
-use crate::STORAGE_SPACE_ALLOCATED;
+use crate::instruction::STORAGE_SPACE_ALLOCATED;
 
 pub(crate) fn get_common_accounts<'a, 'b>(
     accounts: &'a [AccountInfo<'b>],
