@@ -1,5 +1,5 @@
 mod error_code;
-mod instruction;
+pub mod instruction;
 mod payment;
 mod satomic_swap;
 #[cfg(test)]
