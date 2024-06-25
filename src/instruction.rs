@@ -3,9 +3,10 @@ use crate::error_code::{
     INVALID_RECEIVER_PUBKEY, INVALID_SECRET, INVALID_SECRET_HASH, INVALID_SENDER_PUBKEY,
     INVALID_TOKEN_PROGRAM,
 };
+use borsh::{to_vec, BorshDeserialize, BorshSerialize};
 use solana_program::{program_error::ProgramError, pubkey::Pubkey};
 
-#[derive(Debug)]
+#[derive(Debug, BorshSerialize, BorshDeserialize)]
 pub enum AtomicSwapInstruction {
     LamportsPayment {
         secret_hash: [u8; 32],
@@ -47,262 +48,140 @@ pub enum AtomicSwapInstruction {
 }
 
 impl AtomicSwapInstruction {
+    fn validate_common_fields(
+        secret_hash: &[u8],
+        lock_time: u64,
+        amount: u64,
+        receiver: &Pubkey,
+        additional_pubkey: Option<&Pubkey>,
+    ) -> Result<(), ProgramError> {
+        if secret_hash.len() != 32 {
+            return Err(ProgramError::Custom(INVALID_SECRET_HASH));
+        }
+        if lock_time == 0 {
+            return Err(ProgramError::Custom(INVALID_LOCK_TIME));
+        }
+        if amount == 0 {
+            return Err(ProgramError::Custom(INVALID_AMOUNT));
+        }
+        if receiver.to_bytes().len() != 32 {
+            return Err(ProgramError::Custom(INVALID_RECEIVER_PUBKEY));
+        }
+        if let Some(pubkey) = additional_pubkey {
+            if pubkey.to_bytes().len() != 32 {
+                return Err(ProgramError::Custom(INVALID_TOKEN_PROGRAM));
+            }
+        }
+        Ok(())
+    }
+
+    fn validate_secret(secret: &[u8]) -> Result<(), ProgramError> {
+        if secret.len() != 32 {
+            return Err(ProgramError::Custom(INVALID_SECRET));
+        }
+        Ok(())
+    }
+
     pub fn unpack(
         instruction_byte: u8,
         input: &[u8],
     ) -> Result<AtomicSwapInstruction, ProgramError> {
-        match instruction_byte {
-            0 => {
-                if input.len() != 91 {
-                    return Err(ProgramError::Custom(INVALID_INPUT_LENGTH));
-                }
-
-                let secret_hash = input[1..33]
-                    .try_into()
-                    .map_err(|_| ProgramError::Custom(INVALID_SECRET_HASH))?;
-
-                let lock_time_array = input[33..41]
-                    .try_into()
-                    .map_err(|_| ProgramError::Custom(INVALID_LOCK_TIME))?;
-                let lock_time = u64::from_le_bytes(lock_time_array);
-
-                let amount_array = input[41..49]
-                    .try_into()
-                    .map_err(|_| ProgramError::Custom(INVALID_AMOUNT))?;
-                let amount = u64::from_le_bytes(amount_array);
-
-                let receiver = Pubkey::new_from_array(
-                    input[49..81]
-                        .try_into()
-                        .map_err(|_| ProgramError::Custom(INVALID_RECEIVER_PUBKEY))?,
-                );
-
-                let rent_exemption_lamports_array = input[81..89]
-                    .try_into()
-                    .map_err(|_| ProgramError::Custom(INVALID_AMOUNT))?;
-                let rent_exemption_lamports = u64::from_le_bytes(rent_exemption_lamports_array);
-
-                Ok(AtomicSwapInstruction::LamportsPayment {
-                    secret_hash,
-                    lock_time,
-                    amount,
-                    receiver,
-                    rent_exemption_lamports,
-                    vault_bump_seed: input[89],
-                    vault_bump_seed_data: input[90],
-                })
+        if input.len()
+            != match instruction_byte {
+                0 => 92,
+                1 => 124,
+                2 => 116,
+                3 => 116,
+                _ => return Err(ProgramError::Custom(INVALID_ATOMIC_SWAP_INSTRUCTION)),
             }
-            1 => {
-                if input.len() != 123 {
-                    return Err(ProgramError::Custom(INVALID_INPUT_LENGTH));
-                }
-
-                let secret_hash = input[1..33]
-                    .try_into()
-                    .map_err(|_| ProgramError::Custom(INVALID_SECRET_HASH))?;
-
-                let lock_time_array = input[33..41]
-                    .try_into()
-                    .map_err(|_| ProgramError::Custom(INVALID_LOCK_TIME))?;
-                let lock_time = u64::from_le_bytes(lock_time_array);
-
-                let amount_array = input[41..49]
-                    .try_into()
-                    .map_err(|_| ProgramError::Custom(INVALID_AMOUNT))?;
-                let amount = u64::from_le_bytes(amount_array);
-
-                let receiver = Pubkey::new_from_array(
-                    input[49..81]
-                        .try_into()
-                        .map_err(|_| ProgramError::Custom(INVALID_RECEIVER_PUBKEY))?,
-                );
-
-                let token_program = Pubkey::new_from_array(
-                    input[81..113]
-                        .try_into()
-                        .map_err(|_| ProgramError::Custom(INVALID_TOKEN_PROGRAM))?,
-                );
-
-                let rent_exemption_lamports_array = input[113..121]
-                    .try_into()
-                    .map_err(|_| ProgramError::Custom(INVALID_AMOUNT))?;
-                let rent_exemption_lamports = u64::from_le_bytes(rent_exemption_lamports_array);
-
-                Ok(AtomicSwapInstruction::SPLTokenPayment {
-                    secret_hash,
-                    lock_time,
-                    amount,
-                    receiver,
-                    token_program,
-                    rent_exemption_lamports,
-                    vault_bump_seed: input[121],
-                    vault_bump_seed_data: input[122],
-                })
-            }
-            2 => {
-                if input.len() != 115 {
-                    return Err(ProgramError::Custom(INVALID_INPUT_LENGTH));
-                }
-
-                let secret = input[1..33]
-                    .try_into()
-                    .map_err(|_| ProgramError::Custom(INVALID_SECRET))?;
-
-                let lock_time_array = input[33..41]
-                    .try_into()
-                    .map_err(|_| ProgramError::Custom(INVALID_LOCK_TIME))?;
-                let lock_time = u64::from_le_bytes(lock_time_array);
-
-                let amount_array = input[41..49]
-                    .try_into()
-                    .map_err(|_| ProgramError::Custom(INVALID_AMOUNT))?;
-                let amount = u64::from_le_bytes(amount_array);
-
-                let sender = Pubkey::new_from_array(
-                    input[49..81]
-                        .try_into()
-                        .map_err(|_| ProgramError::Custom(INVALID_SENDER_PUBKEY))?,
-                );
-
-                let token_program = Pubkey::new_from_array(
-                    input[81..113]
-                        .try_into()
-                        .map_err(|_| ProgramError::Custom(INVALID_TOKEN_PROGRAM))?,
-                );
-
-                Ok(AtomicSwapInstruction::ReceiverSpend {
-                    secret,
-                    lock_time,
-                    amount,
-                    sender,
-                    token_program,
-                    vault_bump_seed: input[113],
-                    vault_bump_seed_data: input[114],
-                })
-            }
-            3 => {
-                if input.len() != 115 {
-                    return Err(ProgramError::Custom(INVALID_INPUT_LENGTH));
-                }
-
-                let secret_hash = input[1..33]
-                    .try_into()
-                    .map_err(|_| ProgramError::Custom(INVALID_SECRET_HASH))?;
-
-                let lock_time_array = input[33..41]
-                    .try_into()
-                    .map_err(|_| ProgramError::Custom(INVALID_LOCK_TIME))?;
-                let lock_time = u64::from_le_bytes(lock_time_array);
-
-                let amount_array = input[41..49]
-                    .try_into()
-                    .map_err(|_| ProgramError::Custom(INVALID_AMOUNT))?;
-                let amount = u64::from_le_bytes(amount_array);
-
-                let receiver = Pubkey::new_from_array(
-                    input[49..81]
-                        .try_into()
-                        .map_err(|_| ProgramError::Custom(INVALID_RECEIVER_PUBKEY))?,
-                );
-
-                let token_program = Pubkey::new_from_array(
-                    input[81..113]
-                        .try_into()
-                        .map_err(|_| ProgramError::Custom(INVALID_TOKEN_PROGRAM))?,
-                );
-
-                Ok(AtomicSwapInstruction::SenderRefund {
-                    secret_hash,
-                    lock_time,
-                    amount,
-                    receiver,
-                    token_program,
-                    vault_bump_seed: input[113],
-                    vault_bump_seed_data: input[114],
-                })
-            }
-            _ => Err(ProgramError::Custom(INVALID_ATOMIC_SWAP_INSTRUCTION)),
+        {
+            return Err(ProgramError::Custom(INVALID_INPUT_LENGTH));
         }
-    }
-    #[allow(dead_code)]
-    pub fn pack(&self) -> Vec<u8> {
-        let mut buf = Vec::new();
-        match *self {
+        let instruction = AtomicSwapInstruction::try_from_slice(&input[1..])
+            .map_err(|_| ProgramError::Custom(INVALID_ATOMIC_SWAP_INSTRUCTION))?;
+
+        match &instruction {
             AtomicSwapInstruction::LamportsPayment {
-                ref secret_hash,
+                secret_hash,
                 lock_time,
                 amount,
-                ref receiver,
-                rent_exemption_lamports,
-                vault_bump_seed,
-                vault_bump_seed_data,
+                receiver,
+                rent_exemption_lamports: _,
+                vault_bump_seed: _,
+                vault_bump_seed_data: _,
             } => {
-                buf.push(0);
-                buf.extend_from_slice(secret_hash);
-                buf.extend_from_slice(&lock_time.to_le_bytes());
-                buf.extend_from_slice(&amount.to_le_bytes());
-                buf.extend_from_slice(&receiver.to_bytes());
-                buf.extend_from_slice(&rent_exemption_lamports.to_le_bytes());
-                buf.push(vault_bump_seed);
-                buf.push(vault_bump_seed_data);
+                Self::validate_common_fields(secret_hash, *lock_time, *amount, receiver, None)?;
             }
             AtomicSwapInstruction::SPLTokenPayment {
-                ref secret_hash,
+                secret_hash,
                 lock_time,
                 amount,
-                ref receiver,
-                ref token_program,
-                rent_exemption_lamports,
-                vault_bump_seed,
-                vault_bump_seed_data,
+                receiver,
+                token_program,
+                rent_exemption_lamports: _,
+                vault_bump_seed: _,
+                vault_bump_seed_data: _,
             } => {
-                buf.push(1);
-                buf.extend_from_slice(secret_hash);
-                buf.extend_from_slice(&lock_time.to_le_bytes());
-                buf.extend_from_slice(&amount.to_le_bytes());
-                buf.extend_from_slice(&receiver.to_bytes());
-                buf.extend_from_slice(&token_program.to_bytes());
-                buf.extend_from_slice(&rent_exemption_lamports.to_le_bytes());
-                buf.push(vault_bump_seed);
-                buf.push(vault_bump_seed_data);
+                Self::validate_common_fields(
+                    secret_hash,
+                    *lock_time,
+                    *amount,
+                    receiver,
+                    Some(token_program),
+                )?;
             }
             AtomicSwapInstruction::ReceiverSpend {
-                ref secret,
+                secret,
                 lock_time,
                 amount,
-                ref sender,
-                ref token_program,
-                vault_bump_seed,
-                vault_bump_seed_data,
+                sender,
+                token_program,
+                vault_bump_seed: _,
+                vault_bump_seed_data: _,
             } => {
-                buf.push(2);
-                buf.extend_from_slice(secret);
-                buf.extend_from_slice(&lock_time.to_le_bytes());
-                buf.extend_from_slice(&amount.to_le_bytes());
-                buf.extend_from_slice(&sender.to_bytes());
-                buf.extend_from_slice(&token_program.to_bytes());
-                buf.push(vault_bump_seed);
-                buf.push(vault_bump_seed_data);
+                Self::validate_secret(secret)?;
+                if sender.to_bytes().len() != 32 {
+                    return Err(ProgramError::Custom(INVALID_SENDER_PUBKEY));
+                }
+                Self::validate_common_fields(
+                    secret,
+                    *lock_time,
+                    *amount,
+                    sender,
+                    Some(token_program),
+                )?;
             }
             AtomicSwapInstruction::SenderRefund {
-                ref secret_hash,
+                secret_hash,
                 lock_time,
                 amount,
-                ref receiver,
-                ref token_program,
-                vault_bump_seed,
-                vault_bump_seed_data,
+                receiver,
+                token_program,
+                vault_bump_seed: _,
+                vault_bump_seed_data: _,
             } => {
-                buf.push(3);
-                buf.extend_from_slice(secret_hash);
-                buf.extend_from_slice(&lock_time.to_le_bytes());
-                buf.extend_from_slice(&amount.to_le_bytes());
-                buf.extend_from_slice(&receiver.to_bytes());
-                buf.extend_from_slice(&token_program.to_bytes());
-                buf.push(vault_bump_seed);
-                buf.push(vault_bump_seed_data);
+                Self::validate_common_fields(
+                    secret_hash,
+                    *lock_time,
+                    *amount,
+                    receiver,
+                    Some(token_program),
+                )?;
             }
         }
+
+        Ok(instruction)
+    }
+
+    #[allow(dead_code)]
+    pub fn pack(&self) -> Vec<u8> {
+        let mut buf = vec![match *self {
+            AtomicSwapInstruction::LamportsPayment { .. } => 0,
+            AtomicSwapInstruction::SPLTokenPayment { .. } => 1,
+            AtomicSwapInstruction::ReceiverSpend { .. } => 2,
+            AtomicSwapInstruction::SenderRefund { .. } => 3,
+        }];
+        buf.extend(to_vec(&self).unwrap());
         buf
     }
 }
