@@ -1,4 +1,3 @@
-pub const INVALID_INPUT_LENGTH: u32 = 601;
 pub const INVALID_SECRET_HASH: u32 = 602;
 pub const INVALID_LOCK_TIME: u32 = 603;
 pub const INVALID_AMOUNT: u32 = 604;

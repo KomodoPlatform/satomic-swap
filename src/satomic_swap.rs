@@ -19,7 +19,7 @@ pub fn process_instruction<'a>(
     accounts: &'a [AccountInfo],
     instruction_data: &[u8],
 ) -> ProgramResult {
-    let instruction = AtomicSwapInstruction::unpack(instruction_data[0], instruction_data)?;
+    let instruction = AtomicSwapInstruction::unpack(instruction_data)?;
     match instruction {
         AtomicSwapInstruction::LamportsPayment {
             secret_hash,

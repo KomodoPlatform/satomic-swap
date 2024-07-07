@@ -1,7 +1,6 @@
 use crate::error_code::{
-    INVALID_AMOUNT, INVALID_ATOMIC_SWAP_INSTRUCTION, INVALID_INPUT_LENGTH, INVALID_LOCK_TIME,
-    INVALID_RECEIVER_PUBKEY, INVALID_SECRET, INVALID_SECRET_HASH, INVALID_SENDER_PUBKEY,
-    INVALID_TOKEN_PROGRAM,
+    INVALID_AMOUNT, INVALID_ATOMIC_SWAP_INSTRUCTION, INVALID_LOCK_TIME, INVALID_RECEIVER_PUBKEY,
+    INVALID_SECRET, INVALID_SECRET_HASH, INVALID_SENDER_PUBKEY, INVALID_TOKEN_PROGRAM,
 };
 use borsh::{to_vec, BorshDeserialize, BorshSerialize};
 use solana_program::{program_error::ProgramError, pubkey::Pubkey};
@@ -82,22 +81,8 @@ impl AtomicSwapInstruction {
         Ok(())
     }
 
-    pub fn unpack(
-        instruction_byte: u8,
-        input: &[u8],
-    ) -> Result<AtomicSwapInstruction, ProgramError> {
-        if input.len()
-            != match instruction_byte {
-                0 => 92,
-                1 => 124,
-                2 => 116,
-                3 => 116,
-                _ => return Err(ProgramError::Custom(INVALID_ATOMIC_SWAP_INSTRUCTION)),
-            }
-        {
-            return Err(ProgramError::Custom(INVALID_INPUT_LENGTH));
-        }
-        let instruction = AtomicSwapInstruction::try_from_slice(&input[1..])
+    pub fn unpack(input: &[u8]) -> Result<AtomicSwapInstruction, ProgramError> {
+        let instruction = AtomicSwapInstruction::try_from_slice(&input)
             .map_err(|_| ProgramError::Custom(INVALID_ATOMIC_SWAP_INSTRUCTION))?;
 
         match &instruction {
@@ -175,13 +160,6 @@ impl AtomicSwapInstruction {
 
     #[allow(dead_code)]
     pub fn pack(&self) -> Vec<u8> {
-        let mut buf = vec![match *self {
-            AtomicSwapInstruction::LamportsPayment { .. } => 0,
-            AtomicSwapInstruction::SPLTokenPayment { .. } => 1,
-            AtomicSwapInstruction::ReceiverSpend { .. } => 2,
-            AtomicSwapInstruction::SenderRefund { .. } => 3,
-        }];
-        buf.extend(to_vec(&self).unwrap());
-        buf
+        to_vec(&self).unwrap()
     }
 }
